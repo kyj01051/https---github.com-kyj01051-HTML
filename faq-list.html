@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko">
+ <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAQ 리스트</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f9f9f9;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .faq-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .faq-item {
+            margin-bottom: 20px;
+        }
+        .faq-item h3 {
+            color: #0056b3;
+            cursor: pointer;
+        }
+        .faq-item p {
+            color: #555;
+            display: none;
+            margin-top: 10px;
+        }
+        .faq-item.active p {
+            display: block;
+        }
+    </style>
+ </head>
+ <body>
+    <h1>자주 묻는 질문 (FAQ)</h1>
+
+    <div class="faq-container" id="faq-container">
+        <!-- FAQ 항목들이 여기에 동적으로 추가됩니다. -->
+    </div>
+
+    <script>
+        // 페이지 로드 시 FAQ 데이터를 가져와서 동적으로 렌더링
+        fetch('/faq')
+            .then(response => response.json())
+            .then(faqData => {
+                const faqContainer = document.getElementById('faq-container');
+                
+                faqData.forEach(item => {
+                    const faqItem = document.createElement('div');
+                    faqItem.classList.add('faq-item');
+
+                    const question = document.createElement('h3');
+                    question.textContent = item.question;
+
+                    const answer = document.createElement('p');
+                    answer.textContent = item.answer;
+
+                    faqItem.appendChild(question);
+                    faqItem.appendChild(answer);
+                    faqContainer.appendChild(faqItem);
+
+                    // 클릭 시 답변 토글
+                    question.addEventListener('click', () => {
+                        faqItem.classList.toggle('active');
+                    });
+                });
+            })
+            .catch(error => {
+                console.error("FAQ 데이터를 불러오는 데 오류가 발생했습니다:", error);
+            });
+    </script>
+ </body>
+</html>
