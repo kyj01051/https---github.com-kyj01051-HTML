@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="ko">
  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FAQ 리스트</title>
     <style>
         body {
@@ -48,11 +48,11 @@
 
     <script>
         // 페이지 로드 시 FAQ 데이터를 가져와서 동적으로 렌더링
-        fetch('/faq')
+        fetch('http://127.0.0.1:8000/faq')
             .then(response => response.json())
             .then(faqData => {
                 const faqContainer = document.getElementById('faq-container');
-                
+
                 faqData.forEach(item => {
                     const faqItem = document.createElement('div');
                     faqItem.classList.add('faq-item');

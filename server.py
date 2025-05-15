@@ -7,7 +7,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer, util
 from fastapi import HTTPException
 import traceback
-
+from fastapi.templating import Jinja2Templates
 
 from fastapi import FastAPI
 
@@ -16,11 +16,15 @@ app = FastAPI()
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 
-@app.get("/", response_class=HTMLResponse)
-async def root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+from fastapi.middleware.cors import CORSMiddleware
 
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 개발 중에는 *로 두고, 배포할 땐 도메인 제한하세요
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # static 파일 마운트
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -305,6 +309,23 @@ faq_data = [
     }
 ]
 
+@app.get("/", response_class=HTMLResponse)
+async def root(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/faq")
+async def get_faq_list():
+    # faq_data에서 질문 리스트와 답변 일부만 간단히 전달하는 식으로
+    simplified_faqs = []
+    for faq in faq_data:
+        # 각 faq마다 질문 리스트 중 첫 번째 질문과 답변만 보내기 (필요에 따라 변경 가능)
+        simplified_faqs.append({
+            "question": faq["questions"][0] if faq["questions"] else "",
+            "answer": faq["answer"]
+        })
+    return JSONResponse(content=simplified_faqs)
+
 # 간단한 Query 클래스 정의
 class Query(BaseModel):
     question: str
@@ -402,6 +423,19 @@ async def chat_endpoint(request: Request):
             content={"error": f"요청 처리 중 오류 발생: {str(e)}"}
         )
 
+@app.get("/faq")
+async def get_faq_list():
+    faq_list = []
+    for faq in faq_data:
+        questions = faq.get("questions", [])
+        answer = faq.get("answer", "")
+        for q in questions:
+            faq_list.append({
+                "question": q,
+                "answer": answer
+            })
+    return faq_list
+
 
 @app.post("/faq")
 async def answer_question(user_question: Query):
@@ -453,6 +487,24 @@ async def answer_question(user_question: Query):
         return {
             "error": f"오류가 발생했습니다: {str(e)}"
         }
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/login")
+async def login(request: LoginRequest):
+    if request.username == "kyj0928" and request.password == "sakwa03!!":
+        return {"success": True, "message": "로그인 성공"}
+    return {"success": False, "message": "아이디 또는 비밀번호가 올바르지 않습니다."}
+
+@app.post("/logout")
+async def logout():
+    return {"success": True, "message": "로그아웃 성공"}
+
+@app.get("/admin/faq")
+async def admin_get_faq():
+    # 기존 /faq와 같은 내용을 반환
+    return await get_faq_list()
 
 
 # auth.router를 포함하는 코드

@@ -89,14 +89,19 @@
         }
 
         .message {
-            max-width: 60%;
-            padding: 10px 15px;
-            margin: 5px 10px;
+            display: inline-block;
+            padding: 8px 12px;
+            margin: 2px 8px;
             border-radius: 15px;
-            word-wrap: break-word;
+            white-space: normal;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            flex-shrink: 0; /* 작아지지 않게 */
         }
 
         .user {
+            max-width: 200px; /* 사용자 말풍선은 작게 */
+            border-radius: 8px;
             background-color: #007bff;
             color: white;
             align-self: flex-end;
@@ -104,6 +109,8 @@
         }
 
         .bot {
+            max-width: 400px; /* 챗봇은 좀 더 길게 */
+            border-radius: 8px;
             background-color: #e5e5ea;
             color: black;
             align-self: flex-start;
@@ -119,6 +126,14 @@
         .messages-container {
             display: flex;
             flex-direction: column;
+            max-height: 400px;
+            width: 600px;
+            max-width: 100%;
+            background-color: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-y: auto;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.1);
         }
 
         .related-questions {
@@ -157,8 +172,26 @@
             font-size: 1rem;
             margin-right: 10px;
         }
-        
-        .send-btn {
+        .related-questions {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .related-btn {
+            background-color: #f1f1f1;
+            border: 1px solid #ccc;
+            padding: 6px 12px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background-color 0.2s;
+        }
+        .related-btn:hover {
+            background-color: #e0e0e0;
+        }
+
+        .sendBtn {
             padding: 12px 20px;
             background-color: var(--primary-color);
             color: white;
@@ -169,7 +202,7 @@
             transition: background-color 0.2s;
         }
         
-        .send-btn:hover {
+        .sendBtn:hover {
             background-color: #3a80d2;
         }
         
@@ -538,7 +571,7 @@
             </div>
 
             <div class="messages-container" id="messagesContainer">
-                <div class="message-block bot">
+                <!-- <div class="message-block bot">
                     <div class="message bot">여기에 답변 텍스트가 들어갑니다.</div>
                     <div class="related-questions">
                         <button class="related-question-btn">질문1</button>
@@ -546,12 +579,12 @@
                         <button class="related-question-btn">질문3</button>
                     </div>
                 </div>
-                <!-- 다른 메시지들도 이곳에 계속 추가됨 -->
+                   다른 메시지들도 이곳에 계속 추가됨  -->
             </div>
 
             <div class="input-container">
                 <input type="text" class="message-input" id="messageInput" placeholder="궁금한 점을 질문해보세요!">
-                <button class="send-btn" id="sendBtn">전송</button>
+                <button class="sendBtn" id="sendBtn">전송</button>
             </div>
         </div>
     </div>
@@ -826,7 +859,6 @@
  <footer>
     © 2025 대구대학교 문헌정보학과. All rights reserved.
  </footer>
- 
  <script src="/static/script.js"></script>
  
 </body>
