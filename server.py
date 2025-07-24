@@ -1,26 +1,23 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from pydantic import BaseModel
 import numpy as np
 from sentence_transformers import SentenceTransformer, util
-from fastapi import HTTPException
 import traceback
-from fastapi.templating import Jinja2Templates
 
-from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from datetime import datetime # 이 라인을 추가해주세요!
 
 app = FastAPI()
 
-from fastapi import Request
-from fastapi.responses import HTMLResponse
-
-from fastapi.middleware.cors import CORSMiddleware
+# 사용자 질문을 저장할 리스트 (서버 재시작 시 초기화됨)
+user_queries = []
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 개발 중에는 *로 두고, 배포할 땐 도메인 제한하세요
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,6 +28,12 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # 템플릿 설정
 templates = Jinja2Templates(directory="templates")
+
+# --- 여기에 루트 경로 ("/") 엔드포인트 추가 ---
+@app.get("/", response_class=HTMLResponse)
+async def root(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+# --------------------------------------------------
 
 # 모델 로드
 model = SentenceTransformer('snunlp/KR-SBERT-V40K-klueNLI-augSTS')
@@ -309,17 +312,10 @@ faq_data = [
     }
 ]
 
-@app.get("/", response_class=HTMLResponse)
-async def root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
-
 @app.get("/faq")
 async def get_faq_list():
-    # faq_data에서 질문 리스트와 답변 일부만 간단히 전달하는 식으로
     simplified_faqs = []
     for faq in faq_data:
-        # 각 faq마다 질문 리스트 중 첫 번째 질문과 답변만 보내기 (필요에 따라 변경 가능)
         simplified_faqs.append({
             "question": faq["questions"][0] if faq["questions"] else "",
             "answer": faq["answer"]
@@ -329,13 +325,6 @@ async def get_faq_list():
 # 간단한 Query 클래스 정의
 class Query(BaseModel):
     question: str
-
-# 루트 경로 - HTML 반환하는 버전만 유지
-@app.get("/", response_class=HTMLResponse)
-async def read_root():
-    with open("templates/index.html", "r", encoding="utf-8") as f:
-        html_content = f.read()
-    return html_content
 
 # 플레이스홀더 이미지 처리
 @app.get("/api/placeholder/{width}/{height}")
@@ -366,6 +355,11 @@ async def chat_endpoint(request: Request):
 
         print(f"Processing question: {input_question}")
 
+        # --- 사용자 질문 저장 로직 ---
+        # user_queries 리스트와 datetime 모듈이 이 파일 상단에 정의되어 있어야 합니다.
+        user_queries.append({"question": input_question, "timestamp": str(datetime.now())})
+        # ---------------------------
+
         input_embedding = model.encode(input_question, convert_to_tensor=True)
 
         max_score = -1.0
@@ -391,7 +385,6 @@ async def chat_endpoint(request: Request):
                 else:
                     best_related = []
 
-        # for문 종료 후 best_related 값 확인용 출력
         print("최종 best_related:", best_related)
 
         threshold = 0.6
@@ -410,7 +403,7 @@ async def chat_endpoint(request: Request):
             content={
                 "question": input_question,
                 "answer": best_answer,
-                "related_questions": best_related,  # 클라이언트가 버튼으로 사용
+                "related_questions": best_related,
                 "similarity_score": max_score
             }
         )
@@ -422,21 +415,7 @@ async def chat_endpoint(request: Request):
             status_code=400,
             content={"error": f"요청 처리 중 오류 발생: {str(e)}"}
         )
-
-@app.get("/faq")
-async def get_faq_list():
-    faq_list = []
-    for faq in faq_data:
-        questions = faq.get("questions", [])
-        answer = faq.get("answer", "")
-        for q in questions:
-            faq_list.append({
-                "question": q,
-                "answer": answer
-            })
-    return faq_list
-
-
+    
 @app.post("/faq")
 async def answer_question(user_question: Query):
     input_question = user_question.question
@@ -464,7 +443,7 @@ async def answer_question(user_question: Query):
                 best_match_question = faq_questions[max_idx]
                 best_answer = faq.get("answer", "답변이 준비되어 있지 않습니다.")
                 best_related = faq.get("related_questions", [])
-                print("Best related questions:", best_related)  # <-- 여기에 추가!
+                print("Best related questions:", best_related)
 
         threshold = 0.6
         if max_score < threshold:
@@ -487,9 +466,15 @@ async def answer_question(user_question: Query):
         return {
             "error": f"오류가 발생했습니다: {str(e)}"
         }
+
 class LoginRequest(BaseModel):
     username: str
     password: str
+
+# 저장된 사용자 질문을 반환하는 API 엔드포인트
+@app.get("/api/user_queries")
+async def get_user_queries():
+    return JSONResponse(content=user_queries)
 
 @app.post("/login")
 async def login(request: LoginRequest):
@@ -506,8 +491,18 @@ async def admin_get_faq():
     # 기존 /faq와 같은 내용을 반환
     return await get_faq_list()
 
+# /admin/dashboard 함수
+@app.get("/admin/dashboard", response_class=HTMLResponse)
+async def get_admin_dashboard(request: Request):
+    # templates 폴더에 admin_dashboard.html 파일이 있어야 합니다.
+    return templates.TemplateResponse("admin_dashboard.html", {"request": request})
 
-# auth.router를 포함하는 코드
-# 실제 구현에서는 auth 모듈을 적절히 임포트
-# import auth
-# app.include_router(auth.router, prefix="/api")
+# /admin/analytics 함수 (중복 제거)
+@app.get("/admin/analytics", response_class=HTMLResponse)
+async def get_admin_analytics(request: Request):
+    # templates 폴더에 admin_analytics.html 파일이 있어야 합니다.
+    return templates.TemplateResponse("admin_analytics.html", {"request": request})
+
+# if __name__ == "__main__":
+#     import uvicorn
+#     uvicorn.run(app, host="0.0.0.0", port=8000) # 이 부분은 보통 파일 맨 아래에 있습니다.
