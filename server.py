@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Request, HTTPException
+# 기존 import 문들
+from fastapi import FastAPI, Request, HTTPException, Depends # <<< Depends 추가!
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import JSONResponse, HTMLResponse
@@ -7,13 +8,71 @@ import numpy as np
 from sentence_transformers import SentenceTransformer, util
 import traceback
 
+from fastapi import Depends
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime # 이 라인을 추가해주세요!
+from sqlalchemy import create_engine, Column, Integer, String, DateTime # text는 현재 필요 없지만, 있어도 무방합니다.
+from sqlalchemy.orm import sessionmaker, declarative_base, Session # <<< Session 추가!
+from datetime import datetime
+import os # 파일 경로 관리를 위해 os 모듈 추가
 
+
+# --- 데이터베이스 설정 ---
+# 프로젝트 루트 폴더에 'chat_data.db' 파일로 데이터베이스를 생성합니다.
+# 이 파일은 server.py와 같은 위치에 생성됩니다.
+DATABASE_FILE = "chat_data.db"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__)) # server.py 파일의 디렉토리 경로
+DATABASE_PATH = os.path.join(BASE_DIR, DATABASE_FILE)
+
+# SQLite 데이터베이스 엔진 생성
+# check_same_thread=False는 FastAPI와 같은 비동기 환경에서 필요합니다.
+engine = create_engine(f"sqlite:///{DATABASE_PATH}", connect_args={"check_same_thread": False})
+
+# 세션 생성기 (데이터베이스와 상호작용할 때 사용)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# 모든 데이터베이스 모델의 기본 클래스
+Base = declarative_base()
+
+# --- 데이터베이스 모델 정의 ---
+class UserQuery(Base):
+    __tablename__ = "user_queries" # 테이블 이름
+
+    id = Column(Integer, primary_key=True, index=True) # 고유 ID, 기본 키
+    question = Column(String, index=True) # 사용자 질문 내용
+    answer = Column(String) # <<< 이 라인을 추가하는 것입니다!
+    timestamp = Column(DateTime, default=datetime.now) # 질문이 저장된 시간
+
+    def __repr__(self):
+        # repr 함수에도 answer를 추가하여 객체 출력 시 답변도 포함되도록 합니다.
+        return f"<UserQuery(id={self.id}, question='{self.question}', answer='{self.answer}', timestamp='{self.timestamp}')>"
+
+# --- 데이터베이스 테이블 생성 함수 ---
+def init_db():
+    print(f"데이터베이스 초기화 중: {DATABASE_PATH}")
+    # Base.metadata.create_all(engine)은 정의된 모든 테이블을 데이터베이스에 생성합니다.
+    # 이미 테이블이 존재하면 다시 생성하지 않습니다.
+    Base.metadata.create_all(bind=engine)
+    print("데이터베이스 초기화 완료.")
+
+# --- 의존성 주입을 위한 함수 ---
+# 각 요청마다 새로운 데이터베이스 세션을 생성하고, 요청이 끝나면 세션을 닫습니다.
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# --- 이제 기존의 user_queries 리스트는 필요 없습니다. 이 줄은 삭제합니다. ---
+# user_queries = []
+
+
+# FastAPI 앱 인스턴스 생성
 app = FastAPI()
 
-# 사용자 질문을 저장할 리스트 (서버 재시작 시 초기화됨)
-user_queries = []
+init_db() # <<< 이 위치로 옮겨
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -334,7 +393,7 @@ async def placeholder(width: int, height: int):
     )
 
 @app.post("/api/chat")
-async def chat_endpoint(request: Request):
+async def chat_endpoint(request: Request, db: Session = Depends(get_db)):
     try:
         print("Received chat request")
         body = await request.json()
@@ -355,15 +414,11 @@ async def chat_endpoint(request: Request):
 
         print(f"Processing question: {input_question}")
 
-        # --- 사용자 질문 저장 로직 ---
-        # user_queries 리스트와 datetime 모듈이 이 파일 상단에 정의되어 있어야 합니다.
-        user_queries.append({"question": input_question, "timestamp": str(datetime.now())})
-        # ---------------------------
-
+        # --- 1. 사용자 질문과 임베딩 처리 (기존과 동일) ---
         input_embedding = model.encode(input_question, convert_to_tensor=True)
 
         max_score = -1.0
-        best_answer = None
+        best_answer = "답변이 준비되어 있지 않습니다." # 기본 답변 초기화
         best_related = []
 
         for faq in faq_data:
@@ -387,28 +442,51 @@ async def chat_endpoint(request: Request):
 
         print("최종 best_related:", best_related)
 
+        # --- 2. 최종 답변 결정 로직 (여기가 중요!) ---
         threshold = 0.6
+        final_response_answer = "" # 최종적으로 사용자에게 보낼 답변 변수
+        final_response_related_questions = [] # 최종적으로 사용자에게 보낼 관련 질문 변수
+
         if max_score < threshold:
             print(f"No good match found. Best score: {max_score}")
-            return JSONResponse(
-                content={
-                    "question": input_question,
-                    "answer": "죄송합니다. 해당 질문에 대한 적절한 답변을 찾지 못했습니다.",
-                    "related_questions": [],
-                    "similarity_score": max_score
-                }
-            )
+            final_response_answer = "죄송합니다. 해당 질문에 대한 적절한 답변을 찾지 못했습니다."
+            final_response_related_questions = [] # 관련 질문 없음
+        else:
+            final_response_answer = best_answer
+            final_response_related_questions = best_related
 
+
+        # --- 3. 사용자 질문과 최종 답변을 데이터베이스에 저장하는 로직 (핵심 변경!) ---
+        try:
+            new_query = UserQuery(question=input_question, answer=final_response_answer) # <<< 여기에 answer=final_response_answer 추가
+            db.add(new_query) # 세션에 새 쿼리 객체 추가
+            db.commit()      # 변경사항을 데이터베이스에 저장
+            db.refresh(new_query) # 저장된 객체(new_query)의 ID 등을 업데이트 (선택 사항이지만 좋은 습관)
+            print(f"질문과 답변이 데이터베이스에 저장되었습니다: 질문='{new_query.question}', 답변='{new_query.answer}'")
+        except Exception as db_error:
+            db.rollback() # DB 저장 중 오류 발생 시 롤백
+            print(f"Error saving to database: {str(db_error)}")
+            # 데이터베이스 저장 실패해도 챗봇 응답은 계속되도록 예외 처리
+            return JSONResponse(
+                status_code=500,
+                content={"error": f"데이터베이스 저장 중 오류 발생: {str(db_error)}"}
+            )
+        # ---------------------------------------------------------------------------------
+
+
+        # --- 4. 최종 JSON 응답 반환 (결정된 final_response_answer 사용) ---
         return JSONResponse(
             content={
                 "question": input_question,
-                "answer": best_answer,
-                "related_questions": best_related,
+                "answer": final_response_answer, # <<< 이 변수를 사용
+                "related_questions": final_response_related_questions, # <<< 이 변수를 사용
                 "similarity_score": max_score
             }
         )
 
     except Exception as e:
+        # 이 try-except 블록은 전체 요청 처리 중 발생하는 일반적인 오류를 처리합니다.
+        # DB 세션 롤백은 이미 DB 저장 로직 내에서 처리되었습니다.
         print(f"Error processing request: {str(e)}")
         traceback.print_exc()
         return JSONResponse(
@@ -473,8 +551,18 @@ class LoginRequest(BaseModel):
 
 # 저장된 사용자 질문을 반환하는 API 엔드포인트
 @app.get("/api/user_queries")
-async def get_user_queries():
-    return JSONResponse(content=user_queries)
+async def get_user_queries(db: Session = Depends(get_db)): # db: Session = Depends(get_db) 추가
+    # 데이터베이스에서 모든 UserQuery 객체를 가져옵니다.
+    # order_by(UserQuery.timestamp.desc())를 사용하여 최신 질문이 먼저 오도록 정렬합니다.
+    queries = db.query(UserQuery).order_by(UserQuery.timestamp.desc()).all()
+
+    # SQLAlchemy 객체를 JSON 응답을 위해 딕셔너리 리스트로 변환합니다.
+    # datetime 객체는 문자열로 변환해야 JSON 직렬화가 가능합니다.
+    queries_data = [
+        {"id": q.id, "question": q.question, "answer": q.answer, "timestamp": q.timestamp.isoformat()} # <<< answer 추가
+        for q in queries
+    ]
+    return JSONResponse(content=queries_data)
 
 @app.post("/login")
 async def login(request: LoginRequest):
