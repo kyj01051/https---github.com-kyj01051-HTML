@@ -1,59 +1,41 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>관리자 대시보드</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        h1 { color: #333; }
-        ul { list-style-type: none; padding: 0; }
-        li { background: #f4f4f4; margin-bottom: 5px; padding: 10px; border-radius: 5px; }
-    </style>
+    <link rel="stylesheet" href="/static/style.css" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet" />
 </head>
 <body>
-    <h1>관리자 대시보드 페이지입니다.</h1>
-    <p>이 페이지는 admin_dashboard.html 파일에서 로드되었습니다.</p>
+    <header>
+        <h1>대구대학교 문헌정보학과 챗봇 관리자</h1>
+        <span class="admin-badge" id="adminBadge" style="display: none;">관리자</span>
+    </header>
 
-    ---
+    <div class="container admin-container">
+        <div class="sidebar">
+            <h2 class="sidebar-title">메뉴</h2>
+            <nav class="sidebar-nav">
+                <a href="/" class="sidebar-btn"><i class="fas fa-comments"></i> 챗봇 홈</a>
+                <a href="/admin" class="sidebar-btn active"><i class="fas fa-chart-line"></i> 대시보드</a>
+                <a href="/faq_list" class="sidebar-btn"><i class="fas fa-question-circle"></i> FAQ 관리</a>
+            </nav>
+            <div class="auth-controls">
+                <button class="sidebar-btn" id="logoutBtn" style="display: none;"><i class="fas fa-sign-out-alt"></i> 로그아웃</button>
+            </div>
+        </div>
 
-    <h2>최근 사용자 질문</h2>
-    <div id="queryList">
-        로딩 중...
+        <main class="admin-main">
+            <h2>대시보드</h2>
+            <p>이곳에 챗봇 사용 통계와 로그 요약 정보가 표시됩니다.</p>
+        </main>
     </div>
 
-    <script>
-        async function fetchUserQueries() {
-            try {
-                const response = await fetch('/api/user_queries');
-                const queries = await response.json();
-                const queryListDiv = document.getElementById('queryList');
-                queryListDiv.innerHTML = ''; // 기존 내용 지우기
-
-                if (queries.length === 0) {
-                    queryListDiv.innerHTML = '<p>아직 저장된 질문이 없습니다.</p>';
-                    return;
-                }
-
-                const ul = document.createElement('ul');
-                queries.forEach(query => {
-                    const li = document.createElement('li');
-                    li.textContent = `질문: "${query.question}" (시간: ${new Date(query.timestamp).toLocaleString()})`;
-                    ul.appendChild(li);
-                });
-                queryListDiv.appendChild(ul);
-
-            } catch (error) {
-                console.error('사용자 질문을 가져오는 중 오류 발생:', error);
-                document.getElementById('queryList').innerHTML = '<p>질문을 가져오는 데 실패했습니다.</p>';
-            }
-        }
-
-        // 페이지 로드 시 질문 가져오기
-        fetchUserQueries();
-
-        // (선택 사항) 주기적으로 업데이트하려면:
-        // setInterval(fetchUserQueries, 5000); // 5초마다 업데이트 (실제 운영에서는 서버 부하 고려)
-    </script>
+    <footer>
+        © 2025 대구대학교 문헌정보학과. All rights reserved.
+    </footer>
+    <script src="/static/script.js"></script>
 </body>
 </html>
