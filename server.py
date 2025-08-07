@@ -17,12 +17,15 @@ import json
 app = FastAPI()
 
 # --- 데이터베이스 설정 ---
+DATABASE_FOLDER = "database"
 DATABASE_FILE = "chat_data.db"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATABASE_PATH = os.path.join(BASE_DIR, DATABASE_FILE)
+# 💡 수정된 부분: database 폴더를 경로에 추가
+DATABASE_PATH = os.path.join(BASE_DIR, DATABASE_FOLDER, DATABASE_FILE)
 
 engine = create_engine(f"sqlite:///{DATABASE_PATH}", connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# 💡 수정된 부분: declarative_base()의 오타 수정
 Base = declarative_base()
 
 # --- 데이터베이스 모델 정의 ---
@@ -140,10 +143,8 @@ async def chat_endpoint(request: ChatRequest, db: Session = Depends(get_db)):
         if not input_question:
             return JSONResponse(status_code=400, content={"error": "질문이 비어있습니다"})
             
-        # DB에서 모든 FAQ 데이터를 한 번에 로드
         faqs_from_db = db.query(FAQ).all()
         
-        # FAQ 데이터와 질문 임베딩을 미리 준비
         faq_questions = []
         faq_data_map = {}
         
@@ -156,16 +157,13 @@ async def chat_endpoint(request: ChatRequest, db: Session = Depends(get_db)):
                     "related_questions": json.loads(faq.related) if faq.related else []
                 }
         
-        # SBERT 모델을 사용하여 질문 임베딩 계산
         input_embedding = model.encode(input_question, convert_to_tensor=True)
         faq_embeddings = model.encode(faq_questions, convert_to_tensor=True)
         
-        # 유사도 계산
         cos_scores = util.cos_sim(input_embedding, faq_embeddings)[0]
         max_score = cos_scores.max().item()
         max_score_index = cos_scores.argmax().item()
         
-        # 최종 답변 및 관련 질문 결정
         threshold = 0.6
         final_response_answer = "죄송합니다. 해당 질문에 대한 적절한 답변을 찾지 못했습니다."
         final_response_related_questions = []
@@ -176,7 +174,6 @@ async def chat_endpoint(request: ChatRequest, db: Session = Depends(get_db)):
             final_response_answer = best_match_data["answer"]
             final_response_related_questions = best_match_data["related_questions"]
             
-        # 사용자 질문과 최종 답변, 유사도를 데이터베이스에 저장
         try:
             new_query = UserQuery(
                 question=input_question,
@@ -190,7 +187,6 @@ async def chat_endpoint(request: ChatRequest, db: Session = Depends(get_db)):
             db.rollback()
             print(f"Error saving to database: {str(db_error)}")
 
-        # 최종 JSON 응답 반환
         return JSONResponse(
             content={
                 "question": input_question,

@@ -24,6 +24,13 @@ header h1 {
     font-size: 24px;
 }
 
+.message p {
+  margin: 0;
+  line-height: 1.1; /* 여기서 줄 간격 조절 */
+}
+
+
+
 .admin-badge {
     background-color: #e74c3c;
     color: white;
@@ -46,12 +53,16 @@ header h1 {
     flex-direction: column;
     gap: 15px;
     min-height: 400px;
+    /* 💡 이 한 줄을 추가하여 메시지 풍선이 늘어나지 않도록 합니다. */
+    align-items: flex-start;
 }
 
 /* 💡 수정된 부분: 메시지 정렬을 위한 부모 요소 스타일 */
 .message-block {
     display: flex;
     width: 100%;
+    /* 💡 이 한 줄을 추가하여 메시지 블록이 늘어나지 않게 합니다. */
+    flex-grow: 0;
 }
 
 .message-block.user {
@@ -69,6 +80,8 @@ header h1 {
     /* 💡 수정된 부분: 긴 단어 줄 바꿈 속성 추가 */
     word-break: break-word;
     overflow-wrap: break-word;
+    /* 💡 이 한 줄을 추가하여 메시지 블록이 늘어나지 않게 합니다. */
+    flex-grow: 0;
 }
 
 .message.user {
@@ -314,7 +327,7 @@ header h1 {
     gap: 10px;
 }
 .faq-form button {
-    padding: 10px 20px;
+    padding: 20px 30px;
     border: none;
     border-radius: 5px;
     color: white;

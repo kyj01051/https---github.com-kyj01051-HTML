@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', function () {
         messagesContainer.appendChild(messageBlockElement);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
-    
+
     function displayRelatedQuestions(relatedQuestions) {
         if (!relatedQuestions || relatedQuestions.length === 0) return;
 
@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function loadChat() {
         messagesContainer.innerHTML = '';
-        const initialMessage = '안녕하세요! 저는 대구대학교 문헌정보학과 챗봇입니다. 무엇이 궁금하신가요?';
+        const initialMessage = '안녕하세요! 저는 대구대학교 문헌정보학과 챗봇입니다.<p> 무엇이 궁금하신가요?';
         displayMessage(initialMessage, 'bot');
 
         chatHistory.forEach(chat => {
@@ -126,7 +126,10 @@ document.addEventListener('DOMContentLoaded', function () {
             chatHistory = [];
             localStorage.removeItem('chatHistory');
             messagesContainer.innerHTML = '';
-            const initialMessage = '안녕하세요! 저는 대구대학교 문헌정보학과 챗봇입니다. 무엇이 궁금하신가요?';
+            if (relatedQuestionsContainer) {
+                relatedQuestionsContainer.innerHTML = '';  // 관련 질문도 비우기
+            }
+            const initialMessage = '안녕하세요! 저는 대구대학교 문헌정보학과 챗봇입니다.<br>무엇이 궁금하신가요?';
             displayMessage(initialMessage, 'bot');
         });
 
@@ -171,6 +174,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // ======== FAQ 관리 페이지 관련 변수 및 함수 ========
     if (window.location.pathname === '/faq_list') {
         const faqList = document.getElementById('faqList');
         const faqForm = document.getElementById('faqForm');
@@ -192,8 +196,20 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
+        // 💡 수정된 부분: renderFaqList 함수
         function renderFaqList() {
-            faqList.innerHTML = '';
+            const faqTableBody = document.getElementById('faqList');
+            if (!faqTableBody) return;
+
+            faqTableBody.innerHTML = '';
+
+            if (faqs.length === 0) {
+                const noDataRow = document.createElement('tr');
+                noDataRow.innerHTML = `<td colspan="5" style="text-align: center;">등록된 FAQ가 없습니다.</td>`;
+                faqTableBody.appendChild(noDataRow);
+                return;
+            }
+
             faqs.forEach(faq => {
                 const tr = document.createElement('tr');
                 const questionsToDisplay = Array.isArray(faq.questions) ? faq.questions.join(', ') : faq.questions;
@@ -204,12 +220,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     <td>${questionsToDisplay}</td>
                     <td>${faq.answer}</td>
                     <td>${relatedToDisplay || ''}</td>
-                    <td class="actions">
+                    <td class="action-buttons">
                         <button class="edit-btn" data-id="${faq.id}"><i class="fas fa-edit"></i></button>
                         <button class="delete-btn" data-id="${faq.id}"><i class="fas fa-trash-alt"></i></button>
                     </td>
                 `;
-                faqList.appendChild(tr);
+                faqTableBody.appendChild(tr);
             });
         }
 
@@ -254,7 +270,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (relatedQuestionsValue) {
                 relatedArray = relatedQuestionsValue.split(',').map(q => q.trim()).filter(q => q);
             }
-            
+
             const payload = {
                 questions: questionsArray,
                 answer: answerTextarea.value.trim(),
@@ -305,7 +321,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (faq) {
                     faqId.value = faq.id;
                     faqFormTitle.textContent = `FAQ 수정 (ID: ${faq.id})`;
-                    
+
                     questionInput.value = Array.isArray(faq.questions) ? faq.questions.join(', ') : faq.questions;
                     answerTextarea.value = faq.answer;
                     relatedInput.value = Array.isArray(faq.related) ? faq.related.join(', ') : faq.related;
